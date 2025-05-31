@@ -23,6 +23,7 @@ void setup() {
     displayManager.begin();
     randomSeed(analogRead(A0));
     displayManager.clear();
+
 }
 
 uint16_t val[12];
@@ -50,5 +51,16 @@ void loop() {
     if (active_screen) {
         displayManager.render(*active_screen);
     }
+    auto last_data_received = screenManager.get_last_data_received();
+    //if no data 30 sec - turn backlight off
+
+    if (millis() - last_data_received <= 10 * 1000) {
+        displayManager.getLcd().setBacklight(255);
+    } else if (millis() - last_data_received > 10 * 1000 && millis() - last_data_received >= 60 * 1000) {
+        displayManager.getLcd().setBacklight(30);
+    } else {
+        displayManager.getLcd().setBacklight(0);
+    }
+
     delay(2);
 }

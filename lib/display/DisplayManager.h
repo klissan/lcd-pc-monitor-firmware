@@ -1,6 +1,6 @@
 #pragma once
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
+#include <LiquidCrystal_PCF8574.h>
 
 #include "../screen/Screen.h"
 #define COLUMN_COUNT 16
@@ -8,7 +8,7 @@
 
 class DisplayManager {
 private:
-    LiquidCrystal_I2C lcd;
+    LiquidCrystal_PCF8574 lcd;
 
     // Кастомные символы для графика (ступенчатая заливка)
     byte bar_levels[7][8] = {
@@ -28,7 +28,7 @@ private:
     byte on_screen_data[20][4];
     byte previos_screen_data[20][4];
 public:
-    DisplayManager() : lcd(0x27, 20, 4) {
+    DisplayManager() : lcd(0x27) {
        for (int i = 0; i < COLUMN_COUNT; i++) graph_values[i] = 0xFFFF;
        for (int i = 0; i < 20; i++)
            for (int j = 0; j < 4; j++) {
@@ -39,9 +39,8 @@ public:
 
     void begin() {
         delay(1000);
-        lcd.init();
-        lcd.backlight();
-
+        lcd.begin(20, 4);
+        lcd.setBacklight(120);
         delay(1000);
         lcd.clear();
         // Загружаем кастомные символы для графика в слоты 0..6
@@ -82,7 +81,7 @@ public:
         memset(info_block, 0, sizeof(info_block));
     }
 
-    LiquidCrystal_I2C& getLcd() {
+    LiquidCrystal_PCF8574& getLcd() {
         return lcd;
     }
 };

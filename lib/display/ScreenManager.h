@@ -24,23 +24,77 @@ private:
     uint16_t values[MAX_DATA];
     EEPROMDictionary &dictionary;
     char text[STRING_LENGTH];
+    unsigned long last_data_received = 0;
 
 public:
     ScreenManager(EEPROMDictionary& dictionary): dictionary(dictionary) {
     }
 
     void tick() {
-        if (Serial.available() >= 1 && Serial.peek() == 0xFF) {
-            if (Serial.available() >= 8) {
-                Serial.read();  // съедаем 0xFF
-                // Serial.println(F("=== NEW TICK ==="));
-                // Serial.print(F("Free RAM: "));
-                // Serial.println(freeMemory());
+        if (Serial.available() >= 2 && Serial.peek() == 0xFF) {
+            Serial.read(); // съедаем 0xFF
+            byte id = Serial.read();
 
-                parsePacket();
+            if (Serial.available() < 1) return;
+            byte type = Serial.read();
+
+            if (type == 0xEF) {
+                // → фиксированный путь только для констант
+                while (Serial.available() < 4 + 1); // символ + длина
+                char symbol[5];
+                for (int i = 0; i < 4; i++) symbol[i] = Serial.read();
+                symbol[4] = '\0';
+
+                byte string_length = Serial.read();
+                while (Serial.available() < string_length); // дождись строки
+
+                for (int i = 0; i < min(string_length, STRING_LENGTH - 1); i++) {
+                    text[i] = Serial.read();
+                }
+                text[min(string_length, STRING_LENGTH - 1)] = '\0';
+
+                dictionary.set(id, text);
+                last_data_received = millis();
+                Serial.write(0xAA);
+            } else {
+                // остальной разбор — только если это НЕ 0xEF
+                if (Serial.available() < 5 + 1 + 1) return;
+                byte min_value = Serial.read();
+                byte max_value = Serial.read();
+                byte scale = Serial.read();
+                char symbol[5];
+                for (int i = 0; i < 4; i++) symbol[i] = Serial.read();
+                symbol[4] = '\0';
+
+                byte count = Serial.read();
+                while (Serial.available() < count * 2); // все значения
+                for (int i = 0; i < count; i++) {
+                    values[i] = Serial.read() | (Serial.read() << 8);
+                }
+
+                registerOrUpdateScreen(id, type, min_value, max_value, scale, symbol, count);
+                last_data_received = millis();
+                Serial.write(0xAA);
             }
         }
     }
+
+
+
+
+    // void tick() {
+    //     if (Serial.available() >= 1 && Serial.peek() == 0xFF) {
+    //         if (Serial.available() >= 8) {
+    //             Serial.read();  // съедаем 0xFF
+    //             // Serial.println(F("=== NEW TICK ==="));
+    //             // Serial.print(F("Free RAM: "));
+    //             // Serial.println(freeMemory());
+    //
+    //             parsePacket();
+    //         }
+    //     }
+    //
+    // }
 
     void parsePacket() {
         // Читать заголовок
@@ -62,6 +116,7 @@ public:
             }
 
             registerOrUpdateScreen(id, type, min_value, max_value, scale, symbol, count);
+            last_data_received = millis();
             Serial.write(0xAA);
         } else if (type == 0xEF) {
             int string_length = Serial.read();
@@ -71,6 +126,7 @@ public:
             text[min(string_length, STRING_LENGTH - 1)] = '\0';
 
             dictionary.set(id, text);
+            last_data_received = millis();
             Serial.write(0xAA);
         }
     }
@@ -136,4 +192,8 @@ public:
     Screen* getActiveScreen() {
         return activeScreen;
     }
+
+    unsigned long get_last_data_received() {
+        return last_data_received;
+    };
 };
